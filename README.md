@@ -6,6 +6,7 @@ Using Cloudformation helper scripts provides the following benefits
 
 ### cfn-init and meta-data
 cfn-init helper script can be used to read meta data from "AWS::CloudFormation::Init" to bootstrap an EC2 instance. "cfn-init" helper script is executed from user-data. meta data can be used to configure the following
+
 •	Packages to be installed along with their versions
 
 •	Download software archives from an external source and unpackage them 
