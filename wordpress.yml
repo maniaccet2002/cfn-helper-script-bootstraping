@@ -1,0 +1,533 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation template to create a custom VPC
+Parameters:
+  DBName:
+    Description: 'DB Name'
+    Type: String
+  DBUser:
+    Description: 'Database User'
+    Type: String
+  DBPassword:
+    Description: 'Database user password'
+    Type: String
+    NoEcho: true
+  DBRootPassword:
+    Description: 'Database Root Password'
+    Type: String
+    NoEcho: true
+  LatestAmiId:
+    Description: Latest Amazon Linux 2 AMI
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  KeyName:
+    Description: SSH key to connect to EC2 instance
+    Type: AWS::EC2::KeyPair::KeyName
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.10.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: 'wordpress-vpc'
+  IPV6CidrBlock:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref VPC
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: wordpress-igw
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  publicsubnetwebA:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: '10.10.0.0/20'
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '00::/64'
+      Tags:
+        - Key: Name
+          Value: 'pub-sn-web-A'
+  privatesubnetappA:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: '10.10.16.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '01::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-app-A'
+  privatesubnetdbA:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: '10.10.32.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '02::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-db-A'
+  reservedsubnetA:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: '10.10.48.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '03::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'res-sn-A'
+  publicsubnetwebB:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: '10.10.64.0/20'
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '04::/64'
+      Tags:
+        - Key: Name
+          Value: 'pub-sn-web-B'
+  privatesubnetappB:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: '10.10.80.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '05::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-app-B'
+  privatesubnetdbB:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: '10.10.96.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '06::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-db-B'
+  reservedsubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: '10.10.112.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '07::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'res-sn-B'
+  publicsubnetwebC:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: '10.10.128.0/20'
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '08::/64'
+      Tags:
+        - Key: Name
+          Value: 'pub-sn-web-C'
+  privatesubnetappC:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: '10.10.144.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '09::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-app-C'
+  privatesubnetdbC:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: '10.10.160.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '10::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'priv-sn-db-C'
+  reservedsubnetC:
+    Type: AWS::EC2::Subnet
+    DependsOn: IPV6CidrBlock
+    Properties:
+      AvailabilityZone: !Select [ 2, !GetAZs '' ]
+      CidrBlock: '10.10.176.0/20'
+      VpcId: !Ref VPC
+      Ipv6CidrBlock: 
+        Fn::Sub:
+          - ${vpcpart}${subnetpart}
+          - vpcpart: !Select [0, !Split ['00::/56', !Select [0, !GetAtt [VPC, Ipv6CidrBlocks]]]]
+            subnetpart: '11::/64'
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: 'res-sn-C'
+  publicroutetable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+  publicipv4route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+  publicipv6route:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      DestinationIpv6CidrBlock: '::/0'
+      GatewayId: !Ref InternetGateway
+  privateroutetable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PrivateRouteTable
+  routetableassociationwebA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      SubnetId: !Ref publicsubnetwebA
+  routetableassociationwebB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      SubnetId: !Ref publicsubnetwebB
+  routetableassociationwebC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref publicroutetable
+      SubnetId: !Ref publicsubnetwebC
+  routetableassociationappA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetappA
+  routetableassociationappB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetappB
+  routetableassociationappC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetappC
+  routetableassociationdbA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetdbA
+  routetableassociationdbB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetdbB
+  routetableassociationdbC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref privatesubnetdbC
+  routetableassociationreservedA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref reservedsubnetA
+  routetableassociationreservedB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref reservedsubnetB
+  routetableassociationreservedC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref privateroutetable
+      SubnetId: !Ref reservedsubnetC
+  wordpressinstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          Install:
+            - install_cfn
+            - install_packages
+            - start_services
+            - install_wordpress
+            - configure_wordpress
+            - configdb
+        install_cfn:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                Region=${AWS::Region}
+              group: root
+              owner: root
+              mode: '000400'
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.wordpressinstance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource wordpressinstance --configsets Install --region ${AWS::Region}
+              group: root
+              mode: '000400'
+              owner: root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                - /etc/cfn/cfn-hup.conf
+                - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        install_packages:
+          packages:
+            yum:
+              httpd: []
+              mariadb-server: []
+              wget: []
+          commands:
+            install:
+              command: amazon-linux-extras install -y lamp-mariadb10.2-php7.2 php7.2
+          
+        start_services:
+          services:
+            sysvinit:
+              mariadb:
+                enabled: "true"
+                ensureRunning: "true"
+              httpd:
+                enabled: "true"
+                ensureRunning: "true"
+        install_wordpress:
+          sources:
+            /var/www/html: http://wordpress.org/latest.tar.gz
+          files:
+            /tmp/wordpress.setup:
+              content: !Sub |
+                sudo cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+                sudo sed -i "s/'database_name_here'/'${DBName}'/g" wp-config.php
+                sudo sed -i "s/'username_here'/'${DBUser}'/g" wp-config.php
+                sudo sed -i "s/'password_here'/'${DBPassword}'/g" wp-config.php   
+                sudo chown apache:apache * -R
+              mode: "000500"
+              owner: "root"
+              group: "root" 
+            /tmp/permissionsfix:
+              content: !Sub |
+                usermod -a -G apache ec2-user   
+                chown -R ec2-user:apache /var/www
+                chmod 2775 /var/www
+                find /var/www -type d -exec chmod 2775 {} \;
+                find /var/www -type f -exec chmod 0664 {} \;
+              group: root
+              mode: '000500'
+              owner: root
+          commands:
+            fix_permission:
+              command: /tmp/permissionsfix
+        configure_wordpress:
+          commands:
+            move_wordpress:
+              command: cp -rvf /var/www/html/wordpress/* /var/www/html/
+            wordpress_cleanup:
+              command: rm -R /var/www/html/wordpress
+            setup_wordpress:
+              command: /tmp/wordpress.setup
+              cwd: /var/www/html       
+        configdb:
+          files:
+            /tmp/db.setup:
+              content: !Sub |
+                CREATE DATABASE ${DBName};
+                CREATE USER '${DBUser}'@'localhost' IDENTIFIED BY '${DBPassword}';
+                GRANT ALL ON ${DBName}.* TO '${DBUser}'@'localhost';
+                FLUSH PRIVILEGES;
+              mode: "000400"
+              owner: "root"
+              group: "root"
+          commands:
+            fix_permission:
+              command: chmod 777 /tmp/db.setup
+            mariadb_config:
+              command: !Sub | 
+                mysqladmin -u root password '${DBRootPassword}'
+            mysql_database:
+              command: !Sub | 
+                mysql -u root --password=${DBRootPassword} < /tmp/db.setup
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: 't2.micro'
+      KeyName: !Ref KeyName
+      SubnetId: !Ref publicsubnetwebA
+      SecurityGroupIds:
+        - !Ref wordpresssecuritygroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackId} --resource wordpressinstance --configsets Install --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource wordpressinstance --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT15M
+  wordpresssecuritygroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'wordpress security group that allows HTTP and SSH'
+      VpcId: !Ref VPC
+      GroupName: wordpresssg
+      SecurityGroupIngress:
+        - Description: Allow SSH port for IPv4
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+        - Description: Allow SSH port for IPv6
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIpv6: '::/0'
+        - Description: Allow HTT port
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'  
+Outputs:
+  wordpressvpcid:
+    Description: VPC ID for the custom vpc
+    Value: !Ref VPC
+  WebAsubnetid:
+    Description: Subnet ID for WebA
+    Value: !Ref publicsubnetwebA
+  AppAsubnetid:
+    Description: Subnet ID for AppA
+    Value: !Ref privatesubnetappA
+  DBAsubnetid:
+    Description: Subnet ID for DBA
+    Value: !Ref privatesubnetdbA
+  reservedAsubnetid:
+    Description: Subnet ID for ReservedA
+    Value: !Ref reservedsubnetA
+  WebBsubnetid:
+    Description: Subnet ID for WebB
+    Value: !Ref publicsubnetwebB
+  AppBsubnetid:
+    Description: Subnet ID for AppB
+    Value: !Ref privatesubnetappB
+  DBBsubnetid:
+    Description: Subnet ID for DBB
+    Value: !Ref privatesubnetdbB
+  reservedBsubnetid:
+    Description: Subnet ID for ReservedB
+    Value: !Ref reservedsubnetB
+  WebCsubnetid:
+    Description: Subnet ID for WebC
+    Value: !Ref publicsubnetwebC
+  AppCsubnetid:
+    Description: Subnet ID for AppC
+    Value: !Ref privatesubnetappC
+  DBCsubnetid:
+    Description: Subnet ID for DBC
+    Value: !Ref privatesubnetdbC
+  reservedCsubnetid:
+    Description: Subnet ID for ReservedC
+    Value: !Ref reservedsubnetC
+  WordpressInstanceId:
+    Description: Instance ID for the wordpress EC2 instance
+    Value: !Ref wordpressinstance
+  WordpressUrl:
+    Description: URL for the wordpress website
+    Value:
+      Fn::Sub:
+        - ${url}${ip}
+        - url: 'http://'
+          ip: !GetAtt [wordpressinstance, PublicIp ]
+          
+
